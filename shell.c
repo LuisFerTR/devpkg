@@ -2,32 +2,24 @@
 #include "dbg.h"
 #include <stdarg.h>
 
+int Shell_parse_template(Shell *template, va_list argp) {
+
+}
+
 int Shell_exec(Shell template, ...)
 {
     apr_pool_t *p = NULL;
     int rc = -1;
     apr_status_t rv = APR_SUCCESS;
     va_list argp;
-    const char *key = NULL;
-    const char *arg = NULL;
-    int i = 0;
 
     rv = apr_pool_create(&p, NULL);
     check(rv == APR_SUCCESS, "Failed to create pool.");
 
     va_start(argp, template);
 
-    for (key = va_arg(argp, const char *);
-            key != NULL; key = va_arg(argp, const char *)) {
-        arg = va_arg(argp, const char *);
-
-        for (i = 0; template.args[i] != NULL; i++) {
-            if (strcmp(template.args[i], key) == 0) {
-                template.args[i] = arg;
-                break;		// found it
-            }
-        }
-    }
+    rc = Shell_parse_template(&template, argp);
+    check(rc == 0, "Failed parsing template.");
 
     rc = Shell_run(p, &template);
     apr_pool_destroy(p);
@@ -35,9 +27,8 @@ int Shell_exec(Shell template, ...)
     return rc;
 
 error:
-    if (p) {
-        apr_pool_destroy(p);
-    }
+    if (p) apr_pool_destroy(p);
+
     return rc;
 }
 
@@ -71,10 +62,30 @@ int Shell_run(apr_pool_t * p, Shell * cmd)
     check(cmd->exit_why == APR_PROC_EXIT, "%s was killed or crashed",
             cmd->exe);
 
-    return 0;
+    return SHELL_OK;
 
 error:
-    return -1;
+    return SHELL_ERR;
+}
+
+int Shell_parse_template(Shell *template, va_list argp) {
+    const char *key = NULL;
+    const char *arg = NULL;
+    int i = 0;
+
+    for (key = va_arg(argp, const char *);
+            key != NULL; key = va_arg(argp, const char *)) {
+        arg = va_arg(argp, const char *);
+
+        for (i = 0; template->args[i] != NULL; i++) {
+            if (strcmp(template->args[i], key) == 0) {
+                template->args[i] = arg;
+                break;		// found it
+            }
+        }
+    }
+
+    return 0;
 }
 
 Shell CLEANUP_SH = {

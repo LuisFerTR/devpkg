@@ -17,6 +17,9 @@ typedef struct Shell {
     const char *args[MAX_COMMAND_ARGS];
 } Shell;
 
+#define SHELL_OK 0
+#define SHELL_ERR -1
+
 int Shell_run(apr_pool_t * p, Shell * cmd);
 int Shell_exec(Shell cmd, ...);
 
