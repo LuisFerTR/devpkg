@@ -13,6 +13,10 @@
 #define TAR_BZ2_PAT "*.tar.bz2"
 #define CONFIG_SCRIPT "/tmp/pkg-build/configure"
 
+#define COMMAND_OK 0 
+#define COMMAND_NEEDS_INSTALL 1
+#define COMMAND_ERR -1
+
 enum CommandType {
     COMMAND_NONE, COMMAND_INSTALL, COMMAND_LIST, COMMAND_FETCH,
     COMMAND_INIT, COMMAND_BUILD

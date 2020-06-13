@@ -2,9 +2,7 @@
 #include "dbg.h"
 #include <stdarg.h>
 
-int Shell_parse_template(Shell *template, va_list argp) {
-
-}
+static int Shell_parse_template(Shell *template, va_list argp);
 
 int Shell_exec(Shell template, ...)
 {
@@ -68,7 +66,7 @@ error:
     return SHELL_ERR;
 }
 
-int Shell_parse_template(Shell *template, va_list argp) {
+static int Shell_parse_template(Shell *template, va_list argp) {
     const char *key = NULL;
     const char *arg = NULL;
     int i = 0;

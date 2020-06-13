@@ -8,7 +8,7 @@
 #include "db.h"
 #include "shell.h"
 
-int Command_depends(apr_pool_t * p, const char *path)
+int Command_depends(apr_pool_t * p, const char *path) 
 {
     FILE *in = NULL;
     bstring line = NULL;
@@ -16,24 +16,23 @@ int Command_depends(apr_pool_t * p, const char *path)
     in = fopen(path, "r");
     check(in != NULL, "Failed to open downloaded depends: %s", path);
 
-    for (line = bgets((bNgetc) fgetc, in, '\n');
-            line != NULL; 
-            line = bgets((bNgetc) fgetc, in, '\n')) 
-    {
+    for (line = bgets((bNgetc) fgetc, in, '\n'); line != NULL; 
+            line = bgets((bNgetc) fgetc, in, '\n')) {
         btrimws(line);
         log_info("Processing depends: %s", bdata(line));
         int rc = Command_install(p, bdata(line), NULL, NULL, NULL);
-        check(rc == 0, "Failed to install: %s", bdata(line));
+        check(rc == COMMAND_OK, "Failed to install: %s", bdata(line));
         bdestroy(line);
     }
 
+    bdestroy(line);
     fclose(in);
-    return 0;
+    return COMMAND_OK;
 
 error:
     if (line) bdestroy(line);
     if (in) fclose(in);
-    return -1;
+    return COMMAND_ERR;
 }
 
 int Command_fetch(apr_pool_t * p, const char *url, int fetch_only)
@@ -47,15 +46,16 @@ int Command_fetch(apr_pool_t * p, const char *url, int fetch_only)
 
     if (apr_fnmatch(GIT_PAT, info.path, 0) == APR_SUCCESS) {
         rc = Shell_exec(GIT_SH, "URL", url, NULL);
-        check(rc == 0, "git failed.");
+        check(rc == SHELL_OK, "git failed.");
+
     } else if (apr_fnmatch(DEPEND_PAT, info.path, 0) == APR_SUCCESS) {
         check(!fetch_only, "No point in fetching a DEPENDS file.");
 
         if (info.scheme) {
             depends_file = DEPENDS_PATH;
-            rc = Shell_exec(CURL_SH, "URL", url, "TARGET", depends_file,
-                    NULL);
-            check(rc == 0, "Curl failed.");
+            rc = Shell_exec(CURL_SH, "URL", url, "TARGET", depends_file, NULL);
+            check(rc == SHELL_OK, "Curl failed.");
+
         } else {
             depends_file = info.path;
         }
@@ -63,16 +63,16 @@ int Command_fetch(apr_pool_t * p, const char *url, int fetch_only)
         // recursively process the devpkg list
         log_info("Building according to DEPENDS: %s", url);
         rv = Command_depends(p, depends_file);
-        check(rv == 0, "Failed to process the DEPENDS: %s", url);
+        check(rv == COMMAND_OK, "Failed to process the DEPENDS: %s", url);
 
         // this indicates that nothing needs to be done
-        return 0;
+        return COMMAND_OK;
 
     } else if (apr_fnmatch(TAR_GZ_PAT, info.path, 0) == APR_SUCCESS) {
         if (info.scheme) {
             rc = Shell_exec(CURL_SH,
                     "URL", url, "TARGET", TAR_GZ_SRC, NULL);
-            check(rc == 0, "Failed to curl source: %s", url);
+            check(rc == SHELL_OK, "Failed to curl source: %s", url);
         }
 
         rv = apr_dir_make_recursive(BUILD_DIR,
@@ -82,12 +82,13 @@ int Command_fetch(apr_pool_t * p, const char *url, int fetch_only)
                 BUILD_DIR);
 
         rc = Shell_exec(TAR_SH, "FILE", TAR_GZ_SRC, NULL);
-        check(rc == 0, "Failed to untar %s", TAR_GZ_SRC);
+        check(rc == SHELL_OK, "Failed to untar %s", TAR_GZ_SRC);
+
     } else if (apr_fnmatch(TAR_BZ2_PAT, info.path, 0) == APR_SUCCESS) {
         if (info.scheme) {
             rc = Shell_exec(CURL_SH, "URL", url, "TARGET", TAR_BZ2_SRC,
                     NULL);
-            check(rc == 0, "Curl failed.");
+            check(rc == SHELL_OK, "Curl failed.");
         }
 
         apr_status_t rc = apr_dir_make_recursive(BUILD_DIR,
@@ -96,21 +97,20 @@ int Command_fetch(apr_pool_t * p, const char *url, int fetch_only)
 
         check(rc == 0, "Failed to make directory %s", BUILD_DIR);
         rc = Shell_exec(TAR_SH, "FILE", TAR_BZ2_SRC, NULL);
-        check(rc == 0, "Failed to untar %s", TAR_BZ2_SRC);
+        check(rc == SHELL_OK, "Failed to untar %s", TAR_BZ2_SRC);
     } else {
         sentinel("Don't now how to handle %s", url);
     }
 
     // indicates that an install needs to actually run
-    return 1;
+    return COMMAND_NEEDS_INSTALL;
 error:
-    return -1;
+    return COMMAND_ERR;
 }
 
 int Command_build(apr_pool_t * p, const char *url,
         const char *configure_opts, const char *make_opts,
-        const char *install_opts)
-{
+        const char *install_opts) {
     int rc = 0;
 
     check(access(BUILD_DIR, X_OK | R_OK | W_OK) == 0,
@@ -120,27 +120,27 @@ int Command_build(apr_pool_t * p, const char *url,
     if (access(CONFIG_SCRIPT, X_OK) == 0) {
         log_info("Has a configure script, running it.");
         rc = Shell_exec(CONFIGURE_SH, "OPTS", configure_opts, NULL);
-        check(rc == 0, "Failed to configure.");
+        check(rc == SHELL_OK, "Failed to configure.");
     }
 
     rc = Shell_exec(MAKE_SH, "OPTS", make_opts, NULL);
-    check(rc == 0, "Failed to build.");
+    check(rc == SHELL_OK, "Failed to build.");
 
     rc = Shell_exec(INSTALL_SH,
             "TARGET", install_opts ? install_opts : "install",
             NULL);
-    check(rc == 0, "Failed to install.");
+    check(rc == SHELL_OK, "Failed to install.");
 
     rc = Shell_exec(CLEANUP_SH, NULL);
-    check(rc == 0, "Failed to cleanup after build.");
+    check(rc == SHELL_OK, "Failed to cleanup after build.");
 
     rc = DB_update(url);
-    check(rc == 0, "Failed to add this package to the database.");
+    check(rc == DB_OK, "Failed to add this package to the database.");
 
-    return 0;
+    return COMMAND_OK;
 
 error:
-    return -1;
+    return COMMAND_ERR;
 }
 
 int Command_install(apr_pool_t * p, const char *url,
@@ -148,35 +148,37 @@ int Command_install(apr_pool_t * p, const char *url,
         const char *install_opts)
 {
     int rc = 0;
-    check(Shell_exec(CLEANUP_SH, NULL) == 0,
+    check(Shell_exec(CLEANUP_SH, NULL) == SHELL_OK,
             "Failed to cleanup before building.");
 
     rc = DB_find(url);
-    check(rc != -1, "Error checking the install database.");
+    check(rc != DB_ERR, "Error checking the install database.");
 
-    if (rc == 1) {
+    if (rc == DB_FOUND) {
         log_info("Package %s already installed.", url);
-        return 0;
+        return COMMAND_OK;
     }
 
     rc = Command_fetch(p, url, 0);
 
-    if (rc == 1) {
+    if (rc == COMMAND_NEEDS_INSTALL) {
         rc = Command_build(p, url, configure_opts, make_opts,
                 install_opts);
-        check(rc == 0, "Failed to build: %s", url);
-    } else if (rc == 0) {
+        check(rc == COMMAND_OK, "Failed to build: %s", url);
+
+    } else if (rc == COMMAND_OK) {
         // no install needed
         log_info("Depends successfully installed: %s", url);
+    
     } else {
         // had an error
         sentinel("Install failed: %s", url);
     }
 
     Shell_exec(CLEANUP_SH, NULL);
-    return 0;
+    return COMMAND_OK;
 
 error:
     Shell_exec(CLEANUP_SH, NULL);
-    return -1;
+    return COMMAND_ERR;
 }
