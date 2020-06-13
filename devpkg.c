@@ -91,6 +91,7 @@ int main(int argc, const char *argv[])
         case COMMAND_INIT:
             rv = DB_init();
             check(rv == 0, "Failed to make the database.");
+            log_info("Database created succesfully");
             break;
 
         default:
