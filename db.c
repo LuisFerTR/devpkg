@@ -52,11 +52,12 @@ int DB_update(const char *url)
     int rc = fwrite(line->data, blength(line), 1, db);
     check(rc == 1, "Failed to append to the db.");
 
-    return 0;
+    if (db) DB_close(db);
+    return DB_OK;
 error:
     if (db)
         DB_close(db);
-    return -1;
+    return DB_ERR;
 }
 
 int DB_find(const char *url)
@@ -68,11 +69,7 @@ int DB_find(const char *url)
     data = DB_load();
     check(data, "Failed to load: %s", DB_FILE);
 
-    if (binstr(data, 0, line) == BSTR_ERR) {
-        res = 0;
-    } else {
-        res = 1;
-    }
+    res = (binstr(data, 0, line) == BSTR_ERR) ? DB_NOT_FOUND : DB_FOUND; 
 
 error:			// fallthrough
     if (data)
@@ -80,7 +77,7 @@ error:			// fallthrough
     if (line)
         bdestroy(line);
 
-    return res;
+    return DB_ERR;
 }
 
 int DB_init()
@@ -106,11 +103,11 @@ int DB_init()
     }
 
     apr_pool_destroy(p);
-    return 0;
+    return DB_OK;
 
 error:
     apr_pool_destroy(p);
-    return -1;
+    return DB_ERR;
 }
 
 int DB_list()
@@ -120,8 +117,8 @@ int DB_list()
 
     printf("%s", bdata(data));
     bdestroy(data);
-    return 0;
+    return DB_OK;
 
 error:
-    return -1;
+    return DB_ERR;
 }
