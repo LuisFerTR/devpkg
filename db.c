@@ -70,6 +70,7 @@ int DB_find(const char *url)
     check(data, "Failed to load: %s", DB_FILE);
 
     res = (binstr(data, 0, line) == BSTR_ERR) ? DB_NOT_FOUND : DB_FOUND; 
+    return res;
 
 error:			// fallthrough
     if (data)
